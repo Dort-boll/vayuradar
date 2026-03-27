@@ -1,0 +1,5 @@
+{
+  "name": "Vayu Radar",
+  "description": "Next-Generation Internet Intelligence & Threat Visualization Platform",
+  "requestFramePermissions": ["geolocation"]
+}
