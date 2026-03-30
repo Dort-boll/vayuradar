@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
+import { toast } from 'sonner';
 import { 
   getRadarTopRanking, 
   getAsnOverview, 
@@ -10,9 +12,11 @@ import {
   getBlocklistDe,
   getTorExitNodes,
   getBambenekDga,
-  getOpenPhish
+  getOpenPhish,
+  getShadowDragonOim,
+  getMalcorePublicAnalysis
 } from '../services/vayuAsmApi';
-import { Globe, Shield, Database, Activity, Search, ExternalLink, AlertCircle, Network, Server, Bug, Ghost, Link2 } from 'lucide-react';
+import { Globe, Shield, Database, Activity, Search, ExternalLink, AlertCircle, Network, Server, Bug, Ghost, Link2, Zap, Target, Eye } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export const IntelligencePanel: React.FC = () => {
@@ -30,6 +34,10 @@ export const IntelligencePanel: React.FC = () => {
   const [bambenekDgaData, setBambenekDgaData] = useState<string>("");
   const [openPhishData, setOpenPhishData] = useState<string>("");
   
+  // Shadow Dragon & Malcore
+  const [shadowDragonOim, setShadowDragonOim] = useState<any>(null);
+  const [malcoreData, setMalcoreData] = useState<any>(null);
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,11 +47,12 @@ export const IntelligencePanel: React.FC = () => {
         setLoading(true);
         const [
           radar, asn, bgpView, updates, block, dns,
-          threatFox, blocklistDe, torNodes, bambenek, openPhish
+          threatFox, blocklistDe, torNodes, bambenek, openPhish,
+          shadowDragon, malcore
         ] = await Promise.all([
           getRadarTopRanking().catch(() => null),
           getAsnOverview(15169).catch(() => null), // Google ASN
-          getBgpViewAsn(13335).catch(() => null), // Cloudflare ASN
+          getBgpViewAsn(15169).catch(() => null), // Google ASN
           getBgpUpdates(3333).catch(() => ({ data: { updates: [] } })), // RIPE ASN
           getFireholBlocklist().catch(() => ""),
           resolveDns("google.com").catch(() => null),
@@ -51,7 +60,9 @@ export const IntelligencePanel: React.FC = () => {
           getBlocklistDe().catch(() => ""),
           getTorExitNodes().catch(() => ""),
           getBambenekDga().catch(() => ""),
-          getOpenPhish().catch(() => "")
+          getOpenPhish().catch(() => ""),
+          getShadowDragonOim().catch(() => null),
+          getMalcorePublicAnalysis().catch(() => null)
         ]);
 
         setRadarData(radar);
@@ -66,8 +77,13 @@ export const IntelligencePanel: React.FC = () => {
         setTorNodesData(torNodes);
         setBambenekDgaData(bambenek);
         setOpenPhishData(openPhish);
+        
+        setShadowDragonOim(shadowDragon);
+        setMalcoreData(malcore);
       } catch (err) {
-        setError("Failed to fetch intelligence data. Check CORS or API status.");
+        const errorMsg = "Failed to fetch intelligence data. Check CORS or API status.";
+        setError(errorMsg);
+        toast.error(errorMsg);
       } finally {
         setLoading(false);
       }
@@ -78,15 +94,25 @@ export const IntelligencePanel: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full space-y-4 animate-pulse">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="flex flex-col items-center justify-center h-full space-y-4"
+      >
         <Database className="text-accent w-12 h-12 animate-bounce" />
-        <span className="text-xs font-mono text-accent uppercase tracking-widest">Synchronizing Intelligence Feed...</span>
-      </div>
+        <span className="text-xs font-mono text-accent uppercase tracking-widest animate-pulse">Synchronizing Intelligence Feed...</span>
+      </motion.div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar p-6 space-y-6">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="h-full p-4 md:p-6 space-y-6"
+    >
       <div className="flex items-center justify-between border-b border-slate-800 pb-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-accent/10 rounded-lg">
@@ -112,24 +138,33 @@ export const IntelligencePanel: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Cloudflare Radar Section */}
-        <div className="glass-panel p-5 space-y-4 border-l-2 border-accent">
+        <div className="glass-panel p-5 space-y-4 border-l-2 border-blue-500">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Globe className="text-accent w-4 h-4" />
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-300">Cloudflare Radar</h3>
+              <Globe className="text-blue-500 w-4 h-4" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-300">Global Traffic Ranking</h3>
             </div>
-            <span className="text-[10px] text-slate-500 font-mono">TOP RANKING</span>
+            <span className="text-[10px] text-slate-500 font-mono">RADAR</span>
           </div>
-          <div className="space-y-2">
-            {radarData?.result?.ranking?.slice(0, 5).map((item: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-2 bg-slate-900/50 rounded border border-slate-800/50 hover:border-accent/30 transition-colors group">
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-mono text-slate-500 w-4">{i + 1}</span>
-                  <span className="text-xs text-slate-300 font-medium">{item.domain}</span>
+          <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+            {radarData?.result?.top ? radarData.result.top.map((item: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-2 bg-slate-900/50 rounded border border-slate-800/50 hover:bg-blue-500/5 transition-colors">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-slate-500 w-4">{item.rank}</span>
+                  <span className="text-[10px] font-bold text-blue-400">{item.domain}</span>
                 </div>
-                <ExternalLink className="w-3 h-3 text-slate-600 group-hover:text-accent transition-colors cursor-pointer" />
+                {item.category && (
+                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 uppercase">
+                    {item.category}
+                  </span>
+                )}
               </div>
-            )) || <p className="text-[10px] text-slate-600 italic">No ranking data available</p>}
+            )) : (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <Globe className="w-6 h-6 text-slate-700 mb-2" />
+                <p className="text-[10px] text-slate-500 italic">Radar ranking unavailable</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -253,7 +288,7 @@ export const IntelligencePanel: React.FC = () => {
           </div>
           <div className="p-3 bg-slate-900/50 rounded border border-slate-800/50 h-32 overflow-y-auto custom-scrollbar">
             <pre className="text-[9px] font-mono text-rose-400 leading-tight">
-              {blocklist ? blocklist.split('\n').slice(0, 50).join('\n') : 'Blocklist empty or unavailable'}
+              {blocklist ? blocklist.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 50).join('\n') : 'Blocklist empty or unavailable'}
             </pre>
           </div>
           <p className="text-[8px] text-slate-500 italic">
@@ -270,16 +305,33 @@ export const IntelligencePanel: React.FC = () => {
             <span className="text-[10px] text-slate-500 font-mono">ABUSE.CH</span>
           </div>
           <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-            {threatFoxData?.data ? threatFoxData.data.slice(0, 10).map((ioc: any, i: number) => (
-              <div key={i} className="p-2 bg-slate-900/50 rounded border border-slate-800/50 text-[9px] font-mono">
-                <div className="flex justify-between mb-1">
-                  <span className="text-fuchsia-400 font-bold truncate max-w-[150px]">{ioc.ioc_value}</span>
-                  <span className="text-slate-500">{ioc.threat_type}</span>
+            {threatFoxData?.data && threatFoxData.data.length > 0 ? threatFoxData.data.slice(0, 10).map((ioc: any, i: number) => (
+              <div key={i} className="p-3 bg-slate-900/50 rounded border border-slate-800/50 text-[9px] font-mono hover:bg-fuchsia-500/5 transition-colors">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-fuchsia-400 font-bold break-all mr-2">{ioc.ioc_value}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-300 text-[8px] uppercase whitespace-nowrap">
+                    {ioc.confidence_level}% CONF
+                  </span>
                 </div>
-                <div className="text-slate-400 truncate">Tags: {ioc.tags ? ioc.tags.join(', ') : 'none'}</div>
+                <div className="grid grid-cols-2 gap-2 mb-1">
+                  <div>
+                    <span className="text-slate-500 uppercase text-[8px] block">Type</span>
+                    <span className="text-slate-300">{ioc.ioc_type || 'Unknown'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 uppercase text-[8px] block">Threat</span>
+                    <span className="text-rose-400">{ioc.threat_type || 'Unknown'}</span>
+                  </div>
+                </div>
+                <div className="text-slate-500 truncate text-[8px] mt-2 pt-2 border-t border-slate-800/50">
+                  Tags: <span className="text-slate-400">{ioc.tags ? (Array.isArray(ioc.tags) ? ioc.tags.join(', ') : ioc.tags) : 'none'}</span>
+                </div>
               </div>
             )) : (
-              <p className="text-[10px] text-slate-600 italic">No ThreatFox data available</p>
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <Bug className="w-6 h-6 text-slate-700 mb-2" />
+                <p className="text-[10px] text-slate-500 italic">No ThreatFox data available</p>
+              </div>
             )}
           </div>
         </div>
@@ -295,7 +347,7 @@ export const IntelligencePanel: React.FC = () => {
           </div>
           <div className="p-3 bg-slate-900/50 rounded border border-slate-800/50 h-32 overflow-y-auto custom-scrollbar">
             <pre className="text-[9px] font-mono text-red-400 leading-tight">
-              {blocklistDeData ? blocklistDeData.split('\n').slice(0, 50).join('\n') : 'Blocklist.de unavailable'}
+              {blocklistDeData ? blocklistDeData.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 50).join('\n') : 'Blocklist.de unavailable'}
             </pre>
           </div>
           <p className="text-[8px] text-slate-500 italic">
@@ -314,7 +366,7 @@ export const IntelligencePanel: React.FC = () => {
           </div>
           <div className="p-3 bg-slate-900/50 rounded border border-slate-800/50 h-32 overflow-y-auto custom-scrollbar">
             <pre className="text-[9px] font-mono text-purple-400 leading-tight">
-              {torNodesData ? torNodesData.split('\n').filter(l => !l.startsWith('#')).slice(0, 50).join('\n') : 'Tor nodes unavailable'}
+              {torNodesData ? torNodesData.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 50).join('\n') : 'Tor nodes unavailable'}
             </pre>
           </div>
           <p className="text-[8px] text-slate-500 italic">
@@ -333,7 +385,7 @@ export const IntelligencePanel: React.FC = () => {
           </div>
           <div className="p-3 bg-slate-900/50 rounded border border-slate-800/50 h-32 overflow-y-auto custom-scrollbar">
             <pre className="text-[9px] font-mono text-cyan-400 leading-tight">
-              {bambenekDgaData ? bambenekDgaData.split('\n').filter(l => !l.startsWith('#')).slice(0, 50).join('\n') : 'DGA feed unavailable'}
+              {bambenekDgaData ? bambenekDgaData.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 50).join('\n') : 'DGA feed unavailable'}
             </pre>
           </div>
           <p className="text-[8px] text-slate-500 italic">
@@ -352,14 +404,64 @@ export const IntelligencePanel: React.FC = () => {
           </div>
           <div className="p-3 bg-slate-900/50 rounded border border-slate-800/50 h-32 overflow-y-auto custom-scrollbar">
             <pre className="text-[9px] font-mono text-pink-400 leading-tight truncate">
-              {openPhishData ? openPhishData.split('\n').slice(0, 50).join('\n') : 'OpenPhish feed unavailable'}
+              {openPhishData ? openPhishData.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 50).join('\n') : 'OpenPhish feed unavailable'}
             </pre>
           </div>
           <p className="text-[8px] text-slate-500 italic">
             Community-updated phishing URL feed.
           </p>
         </div>
+
+        {/* Shadow Dragon OIM Section */}
+        <div className="glass-panel p-5 space-y-4 border-l-2 border-amber-500">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target className="text-amber-500 w-4 h-4" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-300">Shadow Dragon OIM</h3>
+            </div>
+            <span className="text-[10px] text-slate-500 font-mono">OSINT FUSION</span>
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+            {shadowDragonOim?.patterns ? shadowDragonOim.patterns.map((p: any, i: number) => (
+              <div key={i} className="p-2 bg-slate-900/50 rounded border border-slate-800/50 text-[9px] font-mono">
+                <div className="flex justify-between mb-1">
+                  <span className="text-amber-400 font-bold">{p.name}</span>
+                  <span className="text-slate-500">{p.type}</span>
+                </div>
+                <div className="text-slate-400 leading-tight">{p.description}</div>
+              </div>
+            )) : (
+              <p className="text-[10px] text-slate-600 italic">Shadow Dragon OIM data unavailable</p>
+            )}
+          </div>
+        </div>
+
+        {/* Malcore Analysis Section */}
+        <div className="glass-panel p-5 space-y-4 border-l-2 border-sky-500">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="text-sky-500 w-4 h-4" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-300">Malcore Analysis</h3>
+            </div>
+            <span className="text-[10px] text-slate-500 font-mono">MALWARE</span>
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+            {malcoreData?.recent ? malcoreData.recent.map((m: any, i: number) => (
+              <div key={i} className="p-2 bg-slate-900/50 rounded border border-slate-800/50 text-[9px] font-mono">
+                <div className="flex justify-between mb-1">
+                  <span className="text-sky-400 font-bold truncate max-w-[120px]">{m.hash}</span>
+                  <span className={cn("px-1 rounded", m.score > 90 ? "bg-rose-500/20 text-rose-400" : "bg-sky-500/20 text-sky-400")}>
+                    {m.score}%
+                  </span>
+                </div>
+                <div className="text-slate-400">{m.threat}</div>
+              </div>
+            )) : (
+              <p className="text-[10px] text-slate-600 italic">Malcore analysis data unavailable</p>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 };

@@ -3,6 +3,10 @@ import { Globe } from './components/Globe';
 import { MapView } from './components/MapView';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
 import { IntelligencePanel } from './components/IntelligencePanel';
+import { ThreatFusionCenter } from './components/ThreatFusionCenter';
+import { IOCSearch } from './components/IOCSearch';
+import { ASMDashboard } from './components/ASMDashboard';
+import { BgpTopology } from './components/BgpTopology';
 import { generateMockEvents, fetchRealTimeBgp, fetchPublicBlocklist } from './services/dataEngine';
 import { VayuEvent } from './types';
 import { 
@@ -21,22 +25,31 @@ import {
   Database,
   EyeOff,
   Cpu,
-  Shield
+  Shield,
+  Target,
+  Crosshair,
+  ChevronLeft,
+  ChevronRight,
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { Toaster, toast } from 'sonner';
 
-const SidebarItem = ({ icon: Icon, label, active, onClick }: any) => (
+const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }: any) => (
   <button 
     onClick={onClick}
+    title={collapsed ? label : undefined}
     className={cn(
       "flex items-center gap-3 w-full px-4 py-3 transition-all duration-300 rounded-lg group",
+      collapsed ? "justify-center px-2" : "",
       active ? "bg-highlight/20 text-accent border-r-2 border-accent" : "text-slate-400 hover:bg-highlight/10 hover:text-slate-200"
     )}
   >
-    <Icon size={20} className={cn("transition-transform group-hover:scale-110", active && "text-accent")} />
-    <span className="text-sm font-medium tracking-wide uppercase">{label}</span>
+    <Icon size={20} className={cn("transition-transform group-hover:scale-110 shrink-0", active && "text-accent")} />
+    {!collapsed && <span className="text-sm font-medium tracking-wide uppercase truncate">{label}</span>}
   </button>
 );
 
@@ -58,6 +71,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [simulationMode, setSimulationMode] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [timelineValue, setTimelineValue] = useState(100); // 0-100 for replay
   const [healthIndex, setHealthIndex] = useState(94);
   const [isReplaying, setIsReplaying] = useState(false);
@@ -68,8 +82,12 @@ export default function App() {
 
   useEffect(() => {
     const fetchBlocklist = async () => {
-      const list = await fetchPublicBlocklist();
-      setPublicBlocklist(list.slice(0, 20));
+      try {
+        const list = await fetchPublicBlocklist();
+        setPublicBlocklist(list.slice(0, 20));
+      } catch (error) {
+        toast.error("Failed to fetch public blocklist");
+      }
     };
     fetchBlocklist();
   }, []);
@@ -80,45 +98,50 @@ export default function App() {
 
     const interval = setInterval(async () => {
       if (!isReplaying) {
-        // Fetch real-time BGP updates for a common ASN to enrich the feed
-        const realUpdates = await fetchRealTimeBgp(3333);
-        const newEvents: VayuEvent[] = [];
-        
-        if (realUpdates && realUpdates.length > 0) {
-          const latest = realUpdates[0];
-          if (latest && latest.prefix) {
-            newEvents.push({
-              id: `bgp-${Date.now()}`,
-              timestamp: Date.now(),
-              category: 'bgp',
-              severity: latest.type === 'W' ? 8 : 4,
-              source: {
-                ip: latest.prefix.split('/')[0],
-                asn: 3333,
-                country: 'NL',
-                lat: 52.3676,
-                lon: 4.9041,
-              },
-              metrics: { volume: 0, requests: 0, latency: 0, packetLoss: 0 },
-              tags: ['bgp', 'real-time', latest.type === 'W' ? 'withdrawal' : 'announcement'],
-              description: `BGP ${latest.type === 'W' ? 'Withdrawal' : 'Announcement'} for ${latest.prefix} via AS3333`,
-              type: 'BGP',
-              metadata: {
-                prefix: latest.prefix,
-                origin: 'AS3333',
-                status: latest.type === 'W' ? 'WITHDRAWN' : 'STABLE'
-              }
-            });
+        try {
+          // Fetch real-time BGP updates for a common ASN to enrich the feed
+          const realUpdates = await fetchRealTimeBgp(3333);
+          const newEvents: VayuEvent[] = [];
+          
+          if (realUpdates && realUpdates.length > 0) {
+            const latest = realUpdates[0];
+            if (latest && latest.prefix) {
+              newEvents.push({
+                id: `bgp-${Date.now()}`,
+                timestamp: Date.now(),
+                category: 'bgp',
+                severity: latest.type === 'W' ? 8 : 4,
+                source: {
+                  ip: latest.prefix.split('/')[0],
+                  asn: 3333,
+                  country: 'NL',
+                  lat: 52.3676,
+                  lon: 4.9041,
+                },
+                metrics: { volume: 0, requests: 0, latency: 0, packetLoss: 0 },
+                tags: ['bgp', 'real-time', latest.type === 'W' ? 'withdrawal' : 'announcement'],
+                description: `BGP ${latest.type === 'W' ? 'Withdrawal' : 'Announcement'} for ${latest.prefix} via AS3333`,
+                type: 'BGP',
+                metadata: {
+                  prefix: latest.prefix,
+                  origin: 'AS3333',
+                  status: latest.type === 'W' ? 'WITHDRAWN' : 'STABLE'
+                }
+              });
+            }
           }
-        }
 
-        const mockEvent = generateMockEvents(1)[0];
-        setEvents(prev => {
-          return [...newEvents, mockEvent, ...prev.slice(0, 99)];
-        });
-        
-        // Randomly fluctuate health index
-        setHealthIndex(prev => Math.max(0, Math.min(100, prev + (Math.random() - 0.5) * 2)));
+          const mockEvent = generateMockEvents(1)[0];
+          setEvents(prev => {
+            return [...newEvents, mockEvent, ...prev.slice(0, 99)];
+          });
+          
+          // Randomly fluctuate health index
+          setHealthIndex(prev => Math.max(0, Math.min(100, prev + (Math.random() - 0.5) * 2)));
+        } catch (error) {
+          console.error("Error fetching live updates:", error);
+          // Don't toast on every interval failure to avoid spam
+        }
       }
     }, 5000);
 
@@ -133,12 +156,22 @@ export default function App() {
     else setThreatLevel('LOW');
   }, [events]);
 
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     // Close sidebar on mobile when tab changes
-    if (window.innerWidth < 768) {
+    if (isMobile) {
       setIsSidebarOpen(false);
     }
-  }, [activeTab]);
+  }, [activeTab, isMobile]);
 
   const filteredEvents = useMemo(() => {
     // In a real app, this would filter by timelineValue
@@ -175,7 +208,7 @@ export default function App() {
   }, [events]);
 
   return (
-    <div className="flex h-screen w-screen bg-bg text-slate-200 overflow-hidden flex-col md:flex-row relative">
+    <div className="flex h-[100dvh] w-full bg-bg text-slate-200 overflow-hidden flex-col md:flex-row relative">
       {/* Mobile Header */}
       <div className={cn(
         "md:hidden h-14 border-b border-glass-border flex items-center justify-between px-4 z-40 bg-bg/80 backdrop-blur-md transition-all duration-500",
@@ -202,175 +235,210 @@ export default function App() {
         </div>
       </div>
 
-      {/* Left Sidebar */}
+      {/* Sidebar - Desktop & Mobile Drawer */}
       <AnimatePresence mode="wait">
         {isSidebarOpen && !isZenMode && (
           <>
-            {/* Mobile Backdrop */}
+            {/* Mobile Overlay Backdrop */}
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
             />
+            
             <motion.aside 
-              initial={{ x: -260 }}
-              animate={{ x: 0 }}
-              exit={{ x: -260 }}
-              transition={{ type: "spring", damping: 20, stiffness: 100 }}
-              className="fixed md:relative w-64 h-full border-r border-glass-border flex flex-col p-4 gap-6 z-50 bg-bg/95 md:bg-transparent backdrop-blur-xl md:backdrop-blur-none group"
+              initial={{ x: -300, opacity: 0 }}
+              animate={{ x: 0, opacity: 1, width: isSidebarCollapsed ? 80 : 256 }}
+              exit={{ x: -300, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed lg:relative inset-y-0 left-0 bg-bg/95 lg:bg-bg/40 border-r border-glass-border backdrop-blur-xl z-50 flex flex-col shadow-2xl lg:shadow-none overflow-hidden"
             >
-              <div className="flex items-center justify-between px-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(0,212,255,0.5)]">
-                    <Activity className="text-bg" size={20} />
+              <div className="p-6 flex items-center justify-between border-b border-glass-border/50">
+                <div className="flex items-center gap-3 group cursor-pointer">
+                  <div className="p-2 bg-accent/20 rounded-xl border border-accent/30 group-hover:bg-accent/30 transition-all shadow-[0_0_15px_rgba(249,115,22,0.2)] shrink-0">
+                    <Shield className="text-accent w-6 h-6" />
                   </div>
-                  <h1 className="text-xl font-bold tracking-tighter neon-text">VAYU RADAR</h1>
+                  {!isSidebarCollapsed && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <h1 className="text-xl font-black tracking-tighter text-white group-hover:text-accent transition-colors">VAYU</h1>
+                      <p className="text-[8px] font-black text-accent tracking-[0.3em] uppercase opacity-70">Intelligence Core</p>
+                    </motion.div>
+                  )}
                 </div>
+                <div className="flex gap-1">
+                  <button 
+                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                    className="hidden lg:flex p-2 hover:bg-white/5 rounded-lg text-slate-500 hover:text-white transition-all"
+                    title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                  >
+                    {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+                  </button>
+                  <button 
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="lg:hidden p-2 hover:bg-white/5 rounded-lg text-slate-500 hover:text-white transition-all"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto custom-scrollbar overflow-x-hidden">
+                <div className={cn("mb-4", isSidebarCollapsed ? "px-1" : "px-4")}>
+                  {!isSidebarCollapsed && <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Main Operations</p>}
+                  <div className="space-y-1">
+                    <SidebarItem collapsed={isSidebarCollapsed} icon={GlobeIcon} label="Global Intelligence" active={activeTab === 'intelligence'} onClick={() => setActiveTab('intelligence')} />
+                    <SidebarItem collapsed={isSidebarCollapsed} icon={Target} label="Attack Surface" active={activeTab === 'asm'} onClick={() => setActiveTab('asm')} />
+                    <SidebarItem collapsed={isSidebarCollapsed} icon={ShieldAlert} label="Threat Fusion" active={activeTab === 'fusion'} onClick={() => setActiveTab('fusion')} />
+                    <SidebarItem collapsed={isSidebarCollapsed} icon={Search} label="IOC Explorer" active={activeTab === 'search'} onClick={() => setActiveTab('search')} />
+                  </div>
+                </div>
+
+                <div className={cn("mt-8 mb-4", isSidebarCollapsed ? "px-1" : "px-4")}>
+                  {!isSidebarCollapsed && <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Visualization</p>}
+                  <div className="space-y-1">
+                    <SidebarItem collapsed={isSidebarCollapsed} icon={Activity} label="Live Radar" active={activeTab === 'threat'} onClick={() => setActiveTab('threat')} />
+                    <SidebarItem collapsed={isSidebarCollapsed} icon={Network} label="Knowledge Graph" active={activeTab === 'graph'} onClick={() => setActiveTab('graph')} />
+                    <SidebarItem collapsed={isSidebarCollapsed} icon={Route} label="BGP Topology" active={activeTab === 'bgp'} onClick={() => setActiveTab('bgp')} />
+                    <SidebarItem collapsed={isSidebarCollapsed} icon={EyeOff} label="Deception Grid" active={activeTab === 'deception'} onClick={() => setActiveTab('deception')} />
+                  </div>
+                </div>
+              </nav>
+
+              <div className="p-4 border-t border-glass-border/50 bg-black/20">
+                <div className={cn("flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 group hover:border-white/10 transition-all cursor-pointer", isSidebarCollapsed && "justify-center p-2")}>
+                  <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-xs border border-accent/30 shrink-0">
+                    OB
+                  </div>
+                  {!isSidebarCollapsed && (
+                    <>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-white truncate">Onesimus B.</p>
+                        <p className="text-[9px] text-slate-500 truncate">Security Architect</p>
+                      </div>
+                      <Cpu size={14} className="text-slate-600 group-hover:text-accent transition-colors shrink-0" />
+                    </>
+                  )}
+                </div>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col min-w-0 relative overflow-hidden">
+        <Toaster theme="dark" position="top-right" />
+        {/* Header */}
+        {!isZenMode && (
+          <header className="h-16 border-b border-glass-border bg-bg/40 backdrop-blur-md px-4 md:px-6 flex items-center justify-between z-30 sticky top-0">
+            <div className="flex items-center gap-4">
+              {!isSidebarOpen && (
                 <button 
-                  onClick={() => setIsSidebarOpen(false)} 
-                  className="text-slate-500 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-2 bg-accent/10 border border-accent/30 rounded-lg text-accent hover:bg-accent/20 transition-all flex items-center gap-2 shadow-[0_0_10px_rgba(249,115,22,0.1)]"
                 >
-                  <X size={20} />
+                  <ListFilter size={18} />
+                </button>
+              )}
+              <div className="relative w-40 md:w-80 lg:w-96">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                <input 
+                  type="text" 
+                  placeholder="Search IP, Domain, or ASN..." 
+                  className="w-full bg-highlight/10 border border-glass-border rounded-full py-2 pl-9 pr-4 text-xs focus:outline-none focus:border-accent/50 transition-all placeholder:text-slate-600"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 md:gap-4">
+              <div className={cn(
+                "hidden sm:flex items-center gap-2 px-3 py-1 rounded-full border font-mono text-[9px] font-black tracking-widest",
+                threatLevel === 'CRITICAL' ? "bg-rose-500/10 border-rose-500/50 text-rose-500" :
+                threatLevel === 'ELEVATED' ? "bg-orange-500/10 border-orange-500/50 text-orange-500" :
+                "bg-emerald-500/10 border-emerald-500/50 text-emerald-500"
+              )}>
+                <div className={cn(
+                  "w-1.5 h-1.5 rounded-full animate-pulse",
+                  threatLevel === 'CRITICAL' ? "bg-rose-500 shadow-[0_0_8px_#f43f5e]" :
+                  threatLevel === 'ELEVATED' ? "bg-orange-500 shadow-[0_0_8px_#f59e0b]" :
+                  "bg-emerald-500 shadow-[0_0_8px_#10b981]"
+                )} />
+                THREAT: {threatLevel}
+              </div>
+              
+              <div className="flex items-center gap-1.5 bg-black/20 border border-glass-border p-1 rounded-xl">
+                <button 
+                  onClick={() => setIsZenMode(!isZenMode)}
+                  className={cn(
+                    "p-2 rounded-lg transition-all flex items-center gap-2",
+                    isZenMode ? "bg-accent text-bg shadow-[0_0_15px_rgba(249,115,22,0.4)]" : "text-slate-400 hover:bg-white/5"
+                  )}
+                  title={isZenMode ? "Exit Zen Mode" : "Enter Zen Mode"}
+                >
+                  <Zap size={16} className={cn(isZenMode && "animate-pulse")} />
+                  <span className="text-[9px] font-black uppercase tracking-widest hidden lg:inline">
+                    {isZenMode ? "Exit Zen" : "Zen Mode"}
+                  </span>
+                </button>
+
+                <button 
+                  onClick={() => setShowPanels(!showPanels)}
+                  className={cn(
+                    "p-2 rounded-lg transition-all",
+                    showPanels ? "text-accent bg-accent/10" : "text-slate-400 hover:bg-white/5"
+                  )}
+                  title="Toggle Overlay Panels"
+                >
+                  <Activity size={16} />
                 </button>
               </div>
 
-        <nav className="flex flex-col gap-1">
-          <SidebarItem icon={Shield} label="Fusion Intel" active={activeTab === 'intelligence'} onClick={() => setActiveTab('intelligence')} />
-          <SidebarItem icon={ShieldAlert} label="Threat Engine" active={activeTab === 'threat'} onClick={() => setActiveTab('threat')} />
-          <SidebarItem icon={Activity} label="Traffic Trends" active={activeTab === 'traffic'} onClick={() => setActiveTab('traffic')} />
-          <SidebarItem icon={Route} label="BGP Routing" active={activeTab === 'bgp'} onClick={() => setActiveTab('bgp')} />
-          <SidebarItem icon={EyeOff} label="Deception Layer" active={activeTab === 'deception'} onClick={() => setActiveTab('deception')} />
-          <SidebarItem icon={Network} label="Knowledge Graph" active={activeTab === 'graph'} onClick={() => setActiveTab('graph')} />
-          <SidebarItem icon={Database} label="Data Explorer" active={activeTab === 'explorer'} onClick={() => setActiveTab('explorer')} />
-        </nav>
-
-        <div className="mt-auto flex flex-col gap-4">
-          <div className="glass-panel p-4 bg-accent/5 border-accent/20">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Internet Health</span>
-              <span className={cn("text-xs font-mono font-bold", healthIndex > 90 ? "text-emerald-400" : "text-orange-400")}>
-                {healthIndex.toFixed(1)}%
-              </span>
+              <div className="w-8 h-8 md:w-9 md:h-9 rounded-full border border-glass-border bg-highlight/20 flex items-center justify-center overflow-hidden cursor-pointer hover:border-accent transition-all">
+                <img src="https://picsum.photos/seed/user/40/40" alt="User" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+              </div>
             </div>
-            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-              <div 
-                className={cn("h-full transition-all duration-1000", healthIndex > 90 ? "bg-emerald-500" : "bg-orange-500")} 
-                style={{ width: `${healthIndex}%` }} 
-              />
-            </div>
-          </div>
-
-          <div className="glass-panel p-4 bg-highlight/5">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-mono text-emerald-500 uppercase">System Online</span>
-            </div>
-            <p className="text-[10px] text-slate-500 font-mono leading-tight">
-              Global Nodes: 1,242<br />
-              Ingestion: 4.2 TB/s<br />
-              Latency: 12ms
-            </p>
-          </div>
-        </div>
-      </motion.aside>
-    </>
-  )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <main className="flex-1 relative flex flex-col overflow-hidden">
-        {/* Header / Search */}
-        <header className={cn(
-          "h-16 border-b border-glass-border hidden md:flex items-center justify-between px-4 md:px-8 z-40 backdrop-blur-md transition-all duration-500",
-          isZenMode && "-translate-y-16 opacity-0"
-        )}>
-          <div className="flex items-center gap-4">
-            {!isSidebarOpen && (
-              <button 
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-2 bg-accent/10 border border-accent/30 rounded-lg text-accent hover:bg-accent/20 transition-all flex items-center gap-2"
-              >
-                <ListFilter size={18} />
-              </button>
-            )}
-            <div className="relative w-48 md:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-              <input 
-                type="text" 
-                placeholder="Search IP, Domain, or ASN..." 
-                className="w-full bg-highlight/10 border border-glass-border rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-accent/50 transition-all"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className={cn(
-              "hidden lg:flex items-center gap-2 px-3 py-1 rounded-full border font-mono text-[10px] font-bold",
-              threatLevel === 'CRITICAL' ? "bg-rose-500/10 border-rose-500/50 text-rose-500" :
-              threatLevel === 'ELEVATED' ? "bg-orange-500/10 border-orange-500/50 text-orange-500" :
-              "bg-emerald-500/10 border-emerald-500/50 text-emerald-500"
-            )}>
-              <div className={cn(
-                "w-1.5 h-1.5 rounded-full animate-pulse",
-                threatLevel === 'CRITICAL' ? "bg-rose-500" :
-                threatLevel === 'ELEVATED' ? "bg-orange-500" :
-                "bg-emerald-500"
-              )} />
-              THREAT LEVEL: {threatLevel}
-            </div>
-            
-            <button 
-              onClick={() => setIsZenMode(!isZenMode)}
-              className={cn(
-                "p-2 border rounded-lg transition-all flex items-center gap-2",
-                isZenMode ? "bg-accent text-bg border-accent" : "bg-highlight/10 border-glass-border text-slate-400 hover:bg-highlight/20"
-              )}
-              title={isZenMode ? "Exit Full View" : "Enter Full View"}
-            >
-              <Zap size={18} className={cn(isZenMode && "animate-pulse")} />
-              <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">
-                {isZenMode ? "Exit Full View" : "Full View"}
-              </span>
-            </button>
-
-            <button 
-              onClick={() => setShowPanels(!showPanels)}
-              className="p-2 bg-highlight/10 border border-glass-border rounded-lg text-slate-400 hover:bg-highlight/20 transition-all flex items-center gap-2"
-            >
-              <Activity size={18} className={cn(showPanels && "text-accent")} />
-            </button>
-            <button className="cyber-button hidden md:flex items-center gap-2">
-              <ListFilter size={14} />
-              Filters
-            </button>
-            <div className="w-10 h-10 rounded-full border border-glass-border bg-highlight/20 flex items-center justify-center overflow-hidden">
-              <img src="https://picsum.photos/seed/user/40/40" alt="User" referrerPolicy="no-referrer" />
-            </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {/* Dynamic Viewport */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative overflow-hidden">
           {/* Background View */}
           <div className="absolute inset-0 z-0">
-            {activeTab === 'intelligence' ? (
-              <div className="w-full h-full bg-bg/50 backdrop-blur-sm">
+            {activeTab === 'fusion' ? (
+              <div className="w-full h-full bg-bg/50 backdrop-blur-sm overflow-y-auto custom-scrollbar">
+                <ThreatFusionCenter />
+              </div>
+            ) : activeTab === 'search' ? (
+              <div className="w-full h-full bg-bg/50 backdrop-blur-sm overflow-y-auto custom-scrollbar">
+                <IOCSearch />
+              </div>
+            ) : activeTab === 'intelligence' ? (
+              <div className="w-full h-full bg-bg/50 backdrop-blur-sm overflow-y-auto custom-scrollbar">
                 <IntelligencePanel />
+              </div>
+            ) : activeTab === 'asm' ? (
+              <div className="w-full h-full bg-bg/50 backdrop-blur-sm overflow-y-auto custom-scrollbar">
+                <ASMDashboard initialAssets={['8.8.8.8', '1.1.1.1', 'vayu.net', 'wordpress', 'nginx', 'apache', 'microsoft-iis']} />
               </div>
             ) : activeTab === 'threat' || activeTab === 'deception' ? (
               <Globe events={filteredEvents} simulationMode={simulationMode} />
             ) : activeTab === 'graph' ? (
-              <div className="w-full h-full p-8">
+              <div className="w-full h-full p-4 md:p-8 overflow-y-auto custom-scrollbar">
                 <KnowledgeGraph events={filteredEvents} />
+              </div>
+            ) : activeTab === 'bgp' ? (
+              <div className="w-full h-full bg-bg/50 backdrop-blur-sm overflow-y-auto custom-scrollbar">
+                <BgpTopology />
               </div>
             ) : (
               <MapView events={filteredEvents} />
             )}
             {simulationMode && (
-              <div className="absolute inset-0 bg-rose-500/10 animate-pulse pointer-events-none z-10 border-4 border-rose-500/30" />
+              <div className="absolute inset-0 bg-rose-500/5 animate-pulse pointer-events-none z-10 border-[10px] border-rose-500/20" />
             )}
           </div>
 
@@ -381,11 +449,18 @@ export default function App() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                transition={{ duration: 0.5 }}
-                className="absolute inset-0 pointer-events-none flex flex-col md:flex-row p-4 md:p-6 gap-4 md:gap-6 overflow-y-auto md:overflow-hidden pb-32 md:pb-6"
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="absolute inset-0 pointer-events-none flex flex-col lg:flex-row p-4 md:p-6 gap-4 md:gap-6 overflow-y-auto lg:overflow-hidden pb-32 lg:pb-6"
               >
                 {/* Left Column - Stats & Feed */}
-                <div className="w-full md:w-80 flex flex-col gap-4 md:gap-6 pointer-events-auto shrink-0 max-h-full">
+                <div className="w-full lg:w-80 flex flex-col gap-4 md:gap-6 pointer-events-auto shrink-0 max-h-full relative">
+                  <button 
+                    onClick={() => setShowPanels(false)}
+                    className="absolute -top-2 -right-2 lg:-right-4 z-10 p-1.5 bg-bg/80 border border-glass-border rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-all backdrop-blur-md"
+                    title="Minimize Panels"
+                  >
+                    <Minimize2 size={14} />
+                  </button>
               {activeTab === 'intelligence' && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
@@ -411,7 +486,7 @@ export default function App() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">ASN:</span>
-                          <span className="text-accent">AS13335 (Cloudflare)</span>
+                          <span className="text-accent">AS15169 (Google)</span>
                         </div>
                         <div className="h-1 bg-slate-800 rounded-full mt-2">
                           <div className="h-full bg-accent w-3/4" />

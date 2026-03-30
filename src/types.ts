@@ -37,6 +37,10 @@ export interface VayuEvent {
     vector?: string;
     target_port?: number;
     botnet_id?: string;
+    source?: string;
+    confidence?: number;
+    correlation_id?: string;
+    intel_type?: string;
   };
 }
 

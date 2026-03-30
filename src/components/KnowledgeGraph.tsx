@@ -33,28 +33,28 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ events }) => {
 
     events.forEach(event => {
       // Source Node
-      const sourceId = event.source.asn ? `AS${event.source.asn}` : event.source.country || 'Unknown';
+      const sourceId = event.category === 'osint' ? (event.metadata?.source || 'OSINT') : (event.source.asn ? `AS${event.source.asn}` : event.source.country || 'Unknown');
       if (!nodeIds.has(sourceId)) {
         nodes.push({ 
           id: sourceId, 
           name: sourceId, 
-          val: 5, 
-          color: event.category === 'attack' ? '#fb7185' : (event.category === 'deception' ? '#d946ef' : '#00d4ff'),
-          type: 'ASN'
+          val: event.category === 'osint' ? 8 : 5, 
+          color: event.category === 'attack' ? '#fb7185' : (event.category === 'deception' ? '#d946ef' : (event.category === 'osint' ? '#f59e0b' : '#00d4ff')),
+          type: event.category === 'osint' ? 'INTEL' : 'ASN'
         });
         nodeIds.add(sourceId);
       }
 
       // Target Node
-      if (event.target) {
-        const targetId = event.target.asn ? `AS${event.target.asn}` : event.target.country || 'Unknown';
+      if (event.target || event.category === 'osint') {
+        const targetId = event.category === 'osint' ? (event.metadata?.intel_type || 'Indicator') : (event.target?.asn ? `AS${event.target.asn}` : event.target?.country || 'Unknown');
         if (!nodeIds.has(targetId)) {
           nodes.push({ 
             id: targetId, 
             name: targetId, 
             val: 3, 
-            color: '#3b82f6',
-            type: 'ASN'
+            color: event.category === 'osint' ? '#fcd34d' : '#3b82f6',
+            type: event.category === 'osint' ? 'IOC' : 'ASN'
           });
           nodeIds.add(targetId);
         }
@@ -62,7 +62,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ events }) => {
         links.push({
           source: sourceId,
           target: targetId,
-          color: event.category === 'attack' ? 'rgba(251, 113, 133, 0.4)' : (event.category === 'deception' ? 'rgba(217, 70, 239, 0.4)' : 'rgba(0, 212, 255, 0.2)'),
+          color: event.category === 'attack' ? 'rgba(251, 113, 133, 0.4)' : (event.category === 'deception' ? 'rgba(217, 70, 239, 0.4)' : (event.category === 'osint' ? 'rgba(245, 158, 11, 0.4)' : 'rgba(0, 212, 255, 0.2)')),
           label: event.category
         });
       }

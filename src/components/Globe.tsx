@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars, Sphere, MeshDistortMaterial, Float } from '@react-three/drei';
 import * as THREE from 'three';
@@ -64,6 +64,38 @@ const DeceptionArc = ({ event }: { event: VayuEvent }) => {
       opacity: 0.8,
       transparent: true,
       linewidth: 2
+    }))} />
+  );
+};
+
+const OSINTArc = ({ event }: { event: VayuEvent }) => {
+  if (!event.target) return null;
+
+  const points = useMemo(() => {
+    const start = new THREE.Vector3().setFromSphericalCoords(
+      2,
+      (90 - event.source.lat) * (Math.PI / 180),
+      (event.source.lon + 180) * (Math.PI / 180)
+    );
+    const end = new THREE.Vector3().setFromSphericalCoords(
+      2,
+      (90 - event.target!.lat) * (Math.PI / 180),
+      (event.target!.lon + 180) * (Math.PI / 180)
+    );
+
+    const mid = start.clone().lerp(end, 0.5).normalize().multiplyScalar(2.3);
+    const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+    return curve.getPoints(40);
+  }, [event]);
+
+  const lineGeometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(points), [points]);
+
+  return (
+    <primitive object={new THREE.Line(lineGeometry, new THREE.LineBasicMaterial({
+      color: "#f97316", // Orange 500
+      opacity: 0.7,
+      transparent: true,
+      linewidth: 1
     }))} />
   );
 };
@@ -147,7 +179,15 @@ interface GlobeProps {
 }
 
 export const Globe: React.FC<GlobeProps> = ({ events, simulationMode }) => {
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <div className="w-full h-full min-h-[400px] cursor-grab active:cursor-grabbing">
@@ -177,6 +217,11 @@ export const Globe: React.FC<GlobeProps> = ({ events, simulationMode }) => {
             <DeceptionArc event={event} />
             <HoneypotNode event={event} />
           </React.Fragment>
+        ))}
+
+        {/* OSINT Intelligence */}
+        {events.filter(e => e.category === 'osint').map(event => (
+          <OSINTArc key={event.id} event={event} />
         ))}
 
         <OrbitControls 

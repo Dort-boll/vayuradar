@@ -15,6 +15,20 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      target: 'esnext',
+      minify: 'esbuild',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'motion'],
+            charts: ['recharts', 'd3'],
+            three: ['three', '@react-three/fiber', '@react-three/drei'],
+            map: ['maplibre-gl']
+          }
+        }
+      }
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
